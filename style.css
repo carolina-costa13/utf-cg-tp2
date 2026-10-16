@@ -1,0 +1,23 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #111;
+    font-family: sans-serif;
+}
+
+canvas {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px;
+    border-radius: 5px;
+    pointer-events: none;
+}
