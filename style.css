@@ -16,8 +16,8 @@ canvas {
     top: 10px;
     left: 10px;
     color: white;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(61, 61, 61, 0.6);
     padding: 10px;
-    border-radius: 5px;
+    border-radius: 10px;
     pointer-events: none;
 }

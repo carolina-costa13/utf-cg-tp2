@@ -1,17 +1,49 @@
 // src/camera.js
 const m4 = twgl.m4;
- 
-export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas) {
+
+// Zoom da câmera 1: 1 = distância original, menor = perto, maior = longe
+let zoom = 1;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+
+export function ajustarZoom(delta) {
+    zoom += delta * 0.001;
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+}
+
+// Essa função recebe qual câmera usar, o ângulo de rotação e o canvas, e devolve 
+// uma única matriz que leva um ponto do mundo direto para a tela
+export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas){
+     // Sem isso, a cena ficaria esticada quando a janela não é quadrada.
+     // a = largura/altura.
     const aspect = canvas.clientWidth / canvas.clientHeight;
  
     // Projeção perspectiva (FOV de 60 graus, near = 0.1, far = 200)
+    // Detalhamento:
+    // -> Campo de visão vertical: 60°, convertido para radianos
+    // -> Proporção
+    // Tudo que estiver mais perto que 0,1 ou mais longe que 200 é cortado. 
+    // -> Plano near: 0,1
+    // -> Plano far: 200.
     const projectionMatrix = m4.perspective((60 * Math.PI) / 180, aspect, 0.1, 200);
  
     let cameraMatrix;
  
+
+    // Câmera 1: órbita em torno do centro [0, 0, 0]
+    // O zoom multiplica a posição inteira, então a distância muda
+    // mas o ângulo de visão continua o mesmo.
     if (tipoCamera === 1) {
-        // Câmera 1: órbita em torno do centro [0, 0, 0]
-        const eye = [Math.cos(cameraRotation) * 6, 3.5, Math.sin(cameraRotation) * 6];
+
+        // Esses parâmetros mudam um pouco a posição da câmera, determinada pelo arctan(y/sqrt(x^2 + y^2))
+        // No plano horizontal (x, z) é uma circunferência de raio 6 em volta do centro, e a altura fica constante.
+        // -> Por que é vezes 6:
+        //    |-> arctan(6/6) = 45° (ângulo de visão)
+        const eye = [Math.cos(cameraRotation) * 6 * zoom, 6 * zoom, Math.sin(cameraRotation) * 6 * zoom]
+
+        // A câmera olha sempre para a origem (o centro do diorama). 
+        // O up diz qual direção é “para cima” na tela.
+
         const target = [0, 0, 0];
         const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
@@ -23,8 +55,11 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas) {
         cameraMatrix = m4.lookAt(eye, target, up);
     }
  
-    // CORREÇÃO PRINCIPAL: m4.lookAt devolve a matriz de MUNDO da câmera.
-    // A matriz de view é a inversa dela.
+    // m4.lookAt devolve a matriz de MUNDO da câmera.
+    // Ela diz onde a câmera está no mundo. Mas para desenhar precisamos 
+    // do contrário: levar o mundo para o ponto de vista da câmera
+    // A matriz de view é a inversa dela, por isso usamos ela.
+    // Sem ela a cena aparece distorcida ou se movendo no sentido errado.
     const viewMatrix = m4.inverse(cameraMatrix);
  
     // ViewProjection = Projeção * View
