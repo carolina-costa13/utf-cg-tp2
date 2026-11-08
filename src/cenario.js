@@ -1,5 +1,6 @@
 // src/cenario.js
 import { carregarModeloOBJ } from './carregaObjetos.js';
+import { initVentilador, desenharVentiladorTeto } from './ventilador.js';
 
 const m4 = twgl.m4;
 
@@ -139,6 +140,8 @@ function carregarTextura(gl, url) {
 
 // Faixa do domo entre duas latitudes. As normais são invertidas para apontarem para dentro,
 function criarDomo(gl, latInicio, latFim) {
+
+
     const dados = twgl.primitives.createSphereVertices(RAIO_DOMO, 48, 24, latInicio, latFim);
     for (let i = 0; i < dados.normal.length; i++) {
         dados.normal[i] = -dados.normal[i];
@@ -147,6 +150,9 @@ function criarDomo(gl, latInicio, latFim) {
 }
 
 export async function initCenario(gl) {
+
+    initVentilador(gl);
+
     // Chão do diorama (o disco do TWGL já nasce deitado no plano XZ)
     diskBuffer = twgl.primitives.createDiscBufferInfo(gl, 4.0, 48);
 
@@ -310,4 +316,22 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
             desenharObjeto(gl, programInfo, viewProjectionMatrix, matrizMovel(MESA.x + dx, MESA.z + dz, giro), cadeira, branco, true);
         }
     }
+
+        // VENTILADOR DE TETO (pendurado no topo do domo)
+        /*
+        programaInfo: informações sobre o programa de shaders usado pra desenhar os objetos.
+
+        viewProjectionMatrix: matriz que combina a transformação de visão da câmera com a 
+        projeção 3d para a img 2D (determina como o mundo 3D vai ser apresentado na tela)
+
+        time: tempo fornecido pelo sistema de animação, recebido pela função desenharCenario().
+
+        [0, RAIO_DOMO - 0.1, 0]: vetor posição do ventilador no mundo 3D, define onde o objeto será 
+        colocado.
+
+        0.8: escala/tamanho do ventilador.
+        */
+
+    desenharVentiladorTeto(gl, programInfo, viewProjectionMatrix, time,
+        [0, RAIO_DOMO - 0.1, 0], 0.8);   
 }
