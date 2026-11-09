@@ -11,6 +11,23 @@ export function ajustarZoom(delta) {
     zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 }
 
+// Câmera 2 (orbital): ângulos controlados pelo mouse
+let giroHorizontal = 0;                   // O quanto a câmera deu volta no mundo.
+let alturaDaCamera = Math.PI / 4;         // ângulo entre o chão e câmera.
+const RAIO_ORBITAL = 8;                   // distância da câmera ao centro.
+const ALTURA_ANGULAR_MIN = 0.05;                   // não entra no chão, o máx que a câmera pode arrastar.
+const ALTURA_ANGULAR_MAX = Math.PI / 2 - 0.05;     // não chega a 90° (o 0.05 ajuda a não quebrar o lookAt)
+const SENSIBILIDADE = 0.005;              // radianos por pixel - velocidade da câmera.
+
+export function girarOrbital(dx, dy) {
+    // dx e dy = quantos pixels o mouse andou. Atualizam o giro e a altura da câmera.
+    giroHorizontal -= dx * SENSIBILIDADE;
+    alturaDaCamera += dy * SENSIBILIDADE;
+    // Limita o movimento do mouse pra cima e pra baixo.
+    alturaDaCamera = Math.min(ALTURA_ANGULAR_MAX, Math.max(ALTURA_ANGULAR_MIN, alturaDaCamera));
+}
+
+
 // Essa função recebe qual câmera usar, o ângulo de rotação e o canvas, e devolve 
 // uma única matriz que leva um ponto do mundo direto para a tela
 export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas){
@@ -48,10 +65,17 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas){
         const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
     } else {
-        // Câmera 2: vista superior olhando para baixo
-        const eye = [0, 8, 0.01];
+        // Câmera 2: vista superior olhando para baixo. É uma órbita 
+        // controlada pelo mouse, alvo fixo no centro. A câmera tem 
+        // sua posição numa esfera de raio RAIO_ORBITAL (fórmula dascoordenadas 
+        // esféricas) e o mouse escolhe em qual ponto dessa esfera ela está.
+        const eye = [
+            Math.cos(alturaDaCamera) * Math.cos(giroHorizontal) * RAIO_ORBITAL,
+            Math.sin(alturaDaCamera) * RAIO_ORBITAL,
+            Math.cos(alturaDaCamera) * Math.sin(giroHorizontal) * RAIO_ORBITAL
+        ];
         const target = [0, 0, 0];
-        const up = [0, 0, -1];
+        const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
     }
  

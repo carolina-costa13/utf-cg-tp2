@@ -1,6 +1,6 @@
 // main.js
 import { initCenario, desenharCenario, alternarPorta } from './src/cenario.js';
-import { calcularMatrizesCamera, ajustarZoom} from './src/camera.js';
+import { calcularMatrizesCamera, ajustarZoom, girarOrbital} from './src/camera.js';
 import { criarIluminacao } from './src/iluminacao.js';
 import { initGatos, desenharGatos } from './src/personagem.js';
 
@@ -77,7 +77,7 @@ const iluminacao = criarIluminacao();
 let cameraRotation = 0;
 let tipoCamera = 1;
 
-
+// ----------------  BOTÕES E EVENTOS ----------------
 window.addEventListener('keydown', (event) => {
     switch (event.key) {
         case '1': tipoCamera = 1; break;
@@ -93,6 +93,8 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
+
+// ----------------  RODINHA DO MOUSE - CAM 1 ----------------
 window.addEventListener('wheel', (event) => {
     if (tipoCamera === 1) {
 
@@ -104,6 +106,19 @@ window.addEventListener('wheel', (event) => {
     }
     // Aqui, o passive = false avisa que vai cancelar mesmo, e aí ele funciona
 }, { passive: false });
+
+
+// ----------------  ARRASTAR MOUSE - CAM 2 ----------------
+let arrastando = false;
+
+canvas.addEventListener('mousedown', () => { arrastando = true; });
+window.addEventListener('mouseup', () => { arrastando = false; });
+
+window.addEventListener('mousemove', (event) => {
+    if (arrastando && tipoCamera === 2) {
+        girarOrbital(event.movementX, event.movementY);
+    }
+});
 
 function render(time) {
     twgl.resizeCanvasToDisplaySize(gl.canvas);
