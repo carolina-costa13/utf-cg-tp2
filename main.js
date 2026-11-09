@@ -2,6 +2,7 @@
 import { initCenario, desenharCenario, alternarPorta } from './src/cenario.js';
 import { calcularMatrizesCamera } from './src/camera.js';
 import { criarIluminacao } from './src/iluminacao.js';
+import { initGato, desenharGato } from './src/personagem.js';
 
 const canvas = document.getElementById("canvas");
 const gl = canvas.getContext("webgl");
@@ -76,6 +77,7 @@ const iluminacao = criarIluminacao();
 let cameraRotation = 0;
 let tipoCamera = 1;
 
+
 window.addEventListener('keydown', (event) => {
     switch (event.key) {
         case '1': tipoCamera = 1; break;
@@ -108,10 +110,12 @@ function render(time) {
     const viewProjectionMatrix = calcularMatrizesCamera(tipoCamera, cameraRotation, gl.canvas);
 
     desenharCenario(gl, programInfo, viewProjectionMatrix, time);
+    desenharGato(gl, programInfo, viewProjectionMatrix, iluminacao);
 
     requestAnimationFrame(render);
 }
 
 // Aguarda geometrias, .obj e textura antes de renderizar
 await initCenario(gl);
+await initGato(gl, './assets/cat/source/2b487f291629_model_obj/model.obj','./assets/cat/source/2b487f291629_model_obj/texture_kd.jpg');
 requestAnimationFrame(render);
