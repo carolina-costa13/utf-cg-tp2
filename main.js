@@ -2,7 +2,7 @@
 import { initCenario, desenharCenario, alternarPorta } from './src/cenario.js';
 import { calcularMatrizesCamera, ajustarZoom} from './src/camera.js';
 import { criarIluminacao } from './src/iluminacao.js';
-import { initGato, desenharGato } from './src/personagem.js';
+import { initGatos, desenharGatos } from './src/personagem.js';
 
 const canvas = document.getElementById("canvas");
 const gl = canvas.getContext("webgl");
@@ -127,12 +127,36 @@ function render(time) {
     const viewProjectionMatrix = calcularMatrizesCamera(tipoCamera, cameraRotation, gl.canvas);
 
     desenharCenario(gl, programInfo, viewProjectionMatrix, time);
-    desenharGato(gl, programInfo, viewProjectionMatrix, iluminacao);
+    desenharGatos(gl, programInfo, viewProjectionMatrix, iluminacao);
+   
 
     requestAnimationFrame(render);
 }
 
+const caminhosGatos = [
+    './assets/cat6/source/catsit.obj',
+    './assets/cat9/cat9.obj',
+    './assets/cat8/cat8.obj'
+];
+
+const caminhosTexturas = [
+    
+    [
+        './assets/cat6/textures/aiStandardSurface1_Base_Color.png',
+        './assets/cat6/textures/aiStandardSurface2_Base_Color_2.png'
+    ],
+    
+    './assets/cat9/textures/eye_3.tga.png',
+    './assets/cat9/textures/SHD_frip_Base_Color.tga.png',
+    './assets/cat9/textures/SHD_frip_Mixed_AO.tga.png',
+    './assets/cat9/textures/SHD_frip_Normal_DirectX.tga.png',
+    
+    './assets/cat8/textures/material0_baseColor.jpeg',
+    './assets/cat8/textures/material0_metallicRoughness.jpeg',
+    './assets/cat8/textures/material0_normal.jpeg',
+];
+
 // Aguarda geometrias, .obj e textura antes de renderizar
 await initCenario(gl);
-await initGato(gl, './assets/cat/source/2b487f291629_model_obj/model.obj','./assets/cat/source/2b487f291629_model_obj/texture_kd.jpg');
+await initGatos(gl, caminhosGatos, caminhosTexturas);
 requestAnimationFrame(render);

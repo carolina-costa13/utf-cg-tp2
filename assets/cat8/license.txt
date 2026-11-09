@@ -1,0 +1,11 @@
+Model Information:
+* title:	Licking Cat
+* source:	https://sketchfab.com/3d-models/licking-cat-ad9921cc3a8e47349dbe281a69e186c9
+* author:	Phil_R (https://sketchfab.com/Phil_R)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Licking Cat" (https://sketchfab.com/3d-models/licking-cat-ad9921cc3a8e47349dbe281a69e186c9) by Phil_R (https://sketchfab.com/Phil_R) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
