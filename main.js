@@ -1,6 +1,6 @@
 // main.js
 import { initCenario, desenharCenario, alternarPorta } from './src/cenario.js';
-import { calcularMatrizesCamera } from './src/camera.js';
+import { calcularMatrizesCamera, ajustarZoom} from './src/camera.js';
 import { criarIluminacao } from './src/iluminacao.js';
 import { initGato, desenharGato } from './src/personagem.js';
 
@@ -84,7 +84,7 @@ window.addEventListener('keydown', (event) => {
         case '2': tipoCamera = 2; break;
     }
 
-    // Portas: O = todas, T = cima, B = baixo, F = forno
+    // Portas do cenário: O = todas, T = cima, B = baixo, F = forno
     switch (event.key.toLowerCase()) {
         case 'o': alternarPorta('todas'); break;
         case 't': alternarPorta('cima'); break;
@@ -92,6 +92,18 @@ window.addEventListener('keydown', (event) => {
         case 'f': alternarPorta('forno'); break;
     }
 });
+
+window.addEventListener('wheel', (event) => {
+    if (tipoCamera === 1) {
+
+        event.preventDefault(); // evita a página rolar
+
+        // event.deltaY diz quanto e para que lado rolou: 
+        // positivo ao rolar para baixo, negativo ao rolar para cima
+        ajustarZoom(event.deltaY);
+    }
+    // Aqui, o passive = false avisa que vai cancelar mesmo, e aí ele funciona
+}, { passive: false });
 
 function render(time) {
     twgl.resizeCanvasToDisplaySize(gl.canvas);
@@ -104,6 +116,11 @@ function render(time) {
     twgl.setUniforms(programInfo, { u_luzDirecao: iluminacao.direcaoLuz });
 
     if (tipoCamera === 1) {
+        // A cada quadro o ângulo cresce 0.003 radianos
+        // Ou seja, a camera vai rodando de pouquinho em pouquinho a cada quedro
+        // A conta é: w = 0.003 * 60 = 0.18 rad/s
+        // T = 2π / 0.18 ~ 35s
+        // Se queremos que o tempo de reação seja mais rápido, aumente, caso contrário, diminua.
         cameraRotation += 0.003;
     }
 
