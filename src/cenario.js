@@ -1,6 +1,11 @@
 // src/cenario.js
 import { carregarModeloOBJ } from './carregaObjetos.js';
 import { initVentilador, desenharVentiladorTeto } from './ventilador.js';
+import { tocarSom, pararSom } from './audio.js';
+
+let tempoGeladeiraAberta = 0;
+const TEMPO_LIMITE_ALARME = 5.0; // 5 segundos aberta dispara o alarme
+let alarmeTocando = false;
 
 const m4 = twgl.m4;
 
@@ -86,21 +91,71 @@ const portas = {
 export function alternarPorta(qual) {
     if (qual === 'todas') {
         const algumaAberta = Object.values(portas).some(p => p.alvo > 0);
-        portas.cima.alvo = algumaAberta ? 0 : ANGULO_ABERTA_GELADEIRA;
-        portas.baixo.alvo = algumaAberta ? 0 : ANGULO_ABERTA_GELADEIRA;
-        portas.forno.alvo = algumaAberta ? 0 : ANGULO_ABERTA_FORNO;
+        const novoAlvoGeladeira = algumaAberta ? 0 : ANGULO_ABERTA_GELADEIRA;
+        const novoAlvoForno = algumaAberta ? 0 : ANGULO_ABERTA_FORNO;
+
+        portas.cima.alvo = novoAlvoGeladeira;
+        portas.baixo.alvo = novoAlvoGeladeira;
+        portas.forno.alvo = novoAlvoForno;
+
+        // Toca o som dependendo se foram todas abertas ou fechadas
+        if (algumaAberta) {
+            tocarSom('geladeiraFechar');
+            tocarSom('fornoFechar');
+            pararSom('geladeiraAlarme');
+        } else {
+            tocarSom('geladeiraAbrir');
+            tocarSom('fornoAbrir');
+        }
+
     } else if (qual === 'forno') {
-        portas.forno.alvo = portas.forno.alvo > 0 ? 0 : ANGULO_ABERTA_FORNO;
+        const vaiAbrir = portas.forno.alvo === 0;
+        portas.forno.alvo = vaiAbrir ? ANGULO_ABERTA_FORNO : 0;
+
+        // Toca o som para o forno (podes usar os da geladeira ou criar específicos no audio.js)
+        if (vaiAbrir) {
+            tocarSom('fornoAbrir');
+        } else {
+            tocarSom('fornoFechar');
+        }
+
     } else if (portas[qual]) {
-        portas[qual].alvo = portas[qual].alvo > 0 ? 0 : ANGULO_ABERTA_GELADEIRA;
+        const vaiAbrir = portas[qual].alvo === 0;
+        portas[qual].alvo = vaiAbrir ? ANGULO_ABERTA_GELADEIRA : 0;
+
+        // Toca o som para a porta específica (cima ou baixo da geladeira)
+        if (vaiAbrir) {
+            tocarSom('geladeiraAbrir');
+        } else {
+            tocarSom('geladeiraFechar');
+            pararSom('geladeiraAlarme');
+        }
     }
 }
 
 function atualizarPortas(dt) {
+    // Atualiza a animação suave de todas as portas
     for (const porta of Object.values(portas)) {
         const diferenca = porta.alvo - porta.angulo;
         const passo = VELOCIDADE_PORTA * dt;
         porta.angulo = Math.abs(diferenca) <= passo ? porta.alvo : porta.angulo + Math.sign(diferenca) * passo;
+    }
+
+    // --- Lógica do Alarme da Geladeira ---
+    const geladeiraAberta = portas.cima.alvo > 0 || portas.baixo.alvo > 0;
+
+    if (geladeiraAberta) {
+        tempoGeladeiraAberta += dt;
+        
+        // Se passou do limite e o alarme ainda não está a tocar
+        if (tempoGeladeiraAberta >= TEMPO_LIMITE_ALARME && !alarmeTocando) {
+            tocarSom('geladeiraAlarme'); // Certifica-te de registar este som no audio.js
+            alarmeTocando = true;
+        }
+    } else {
+        // Se a geladeira foi fechada, reinicia o temporizador e o alarme
+        tempoGeladeiraAberta = 0;
+        alarmeTocando = false;
     }
 }
 
@@ -334,4 +389,106 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
 
     desenharVentiladorTeto(gl, programInfo, viewProjectionMatrix, time,
         [0, RAIO_DOMO - 0.1, 0], 0.8);   
+}
+//---------------------------------------------------------------
+// som fritura ao clicar no fogão
+//---------------------------------------------------------------
+
+// Converte as coordenadas do clique (Canvas) para um raio 3D no mundo
+// Converte as coordenadas do clique (Canvas) para um raio 3D no mundo
+function obterRaioDoClique(event, canvas, viewProjectionMatrix) {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / canvas.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / canvas.height) * 2 + 1;
+
+    // Usa twgl.m4 para inverter a matriz View-Projection
+    const invViewProj = twgl.m4.inverse(viewProjectionMatrix);
+    if (!invViewProj) return null;
+
+    // Transforma os pontos do Near Plane e Far Plane
+    const nearPoint = twgl.m4.transformPoint(invViewProj, [x, y, -1]);
+    const farPoint = twgl.m4.transformPoint(invViewProj, [x, y, 1]);
+
+    // Usa twgl.v3 para calcular a direção do raio
+    const direcao = twgl.v3.normalize(twgl.v3.subtract(farPoint, nearPoint));
+    return { origem: nearPoint, direcao };
+}
+
+// Teste de intersecção com a Bounding Box aproximada do forno
+function clicouNoForno(raio, posicaoForno, tamanhoForno) {
+    if (!raio) return false;
+
+    const min = twgl.v3.subtract(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
+    const max = twgl.v3.add(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
+
+    let tmin = (min[0] - raio.origem[0]) / raio.direcao[0];
+    let tmax = (max[0] - raio.origem[0]) / raio.direcao[0];
+
+    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+    let tymin = (min[1] - raio.origem[1]) / raio.direcao[1];
+    let tymax = (max[1] - raio.origem[1]) / raio.direcao[1];
+
+    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+    if ((tmin > tymax) || (tymin > tmax)) return false;
+
+    if (tymin > tmin) tmin = tymin;
+    if (tymax < tmax) tmax = tymax;
+
+    let tzmin = (min[2] - raio.origem[2]) / raio.direcao[2];
+    let tzmax = (max[2] - raio.origem[2]) / raio.direcao[2];
+
+    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+    if ((tmin > tzmax) || (tzmin > tmax)) return false;
+
+    return true;
+}
+// --- FUNÇÕES DE RAYCASTING PARA O CLIQUE NO FORNO ---
+
+export function verificarCliqueNoForno(event, canvas, viewProjectionMatrix) {
+    // 1. Pega nas dimensões reais do elemento no ecrã (clientWidth)
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+    const y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
+
+    // Usa twgl.m4 para inverter a matriz
+    const invViewProj = twgl.m4.inverse(viewProjectionMatrix);
+    if (!invViewProj) return false;
+
+    const nearPoint = twgl.m4.transformPoint(invViewProj, [x, y, -1]);
+    const farPoint = twgl.m4.transformPoint(invViewProj, [x, y, 1]);
+    const direcao = twgl.v3.normalize(twgl.v3.subtract(farPoint, nearPoint));
+    const raio = { origem: nearPoint, direcao };
+
+    // 2. Calcula a posição exata onde o fogão é desenhado (noFundo(1))
+    const [fx, fz] = noFundo(1);
+    const posicaoForno = [fx, 0.0, fz]; // Altura 0 no centro da célula
+    
+    // 3. Tamanho da bounding box ajustado à escala dos móveis (CELULA = 1.3)
+    const tamanhoForno = [CELULA * 0.9, 1.0, CELULA * 0.9]; 
+
+    const min = twgl.v3.subtract(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
+    const max = twgl.v3.add(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
+
+    let tmin = (min[0] - raio.origem[0]) / raio.direcao[0];
+    let tmax = (max[0] - raio.origem[0]) / raio.direcao[0];
+    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+    let tymin = (min[1] - raio.origem[1]) / raio.direcao[1];
+    let tymax = (max[1] - raio.origem[1]) / raio.direcao[1];
+    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+    if ((tmin > tymax) || (tymin > tmax)) return false;
+    if (tymin > tmin) tmin = tymin;
+    if (tymax < tmax) tmax = tymax;
+
+    let tzmin = (min[2] - raio.origem[2]) / raio.direcao[2];
+    let tzmax = (max[2] - raio.origem[2]) / raio.direcao[2];
+    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+    if ((tmin > tzmax) || (tzmin > tmax)) return false;
+
+    return true; // Acertou no fogão!
 }
