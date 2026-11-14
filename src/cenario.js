@@ -207,9 +207,13 @@ function criarDomo(gl, latInicio, latFim) {
 export async function initCenario(gl) {
 
     initVentilador(gl);
+    initFumaca(gl);
+    initAgua(gl);
 
     // Chão do diorama (o disco do TWGL já nasce deitado no plano XZ)
     diskBuffer = twgl.primitives.createDiscBufferInfo(gl, 4.0, 48);
+
+    copoBuffer = twgl.primitives.createCylinderBufferInfo(gl, 1, 1, 24, 1);
 
     // Meia esfera (hemisfério inferior): latitude de 90° (equador) até 180° (polo sul).
     // Mesmo raio (4.0) e mesmas 48 divisões do disco, para a borda encaixar sem degrau.
@@ -270,6 +274,8 @@ function desenharObjeto(gl, programInfo, viewProjectionMatrix, worldMatrix, buff
         u_color: cor,
         u_usaTextura: usaTextura ? 1 : 0,
         u_xadrez: 0,
+        u_ehAgua: 0,
+        u_ehParticula: 0.0,
         ...extras,
     };
     if (texturaRestaurante) uniforms.u_texture = texturaRestaurante;
@@ -286,7 +292,7 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
 
     // --- A. MEIA ESFERA LOGO ABAIXO DO CHÃO ---
     const worldMeiaEsfera = m4.translation([0, -0.01, 0]);
-    desenharObjeto(gl, programInfo, viewProjectionMatrix, worldMeiaEsfera, meiaEsferaBuffer, [0.35, 0.25, 0.2, 1.0], false);
+    desenharObjeto(gl, programInfo, viewProjectionMatrix, worldMeiaEsfera, meiaEsferaBuffer, [0.35, 0.25, 0.18, 1.0], false);
 
     // --- B. CHÃO XADREZ DO DIORAMA (Disco superior) ---
     const worldChao = m4.translation([0, -0.01, 0]);
@@ -370,6 +376,7 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
         for (const [dx, dz, giro] of cadeiras) {
             desenharObjeto(gl, programInfo, viewProjectionMatrix, matrizMovel(MESA.x + dx, MESA.z + dz, giro), cadeira, branco, true);
         }
+
     }
 
         // VENTILADOR DE TETO (pendurado no topo do domo)
@@ -389,63 +396,17 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
 
     desenharVentiladorTeto(gl, programInfo, viewProjectionMatrix, time,
         [0, RAIO_DOMO - 0.1, 0], 0.8);   
+
+     // PARTÍCULAS (sempre por último, por causa da transparência) ---
+    atualizarNivelPia(dt);
+    desenharAguaPia(gl, programInfo, viewProjectionMatrix);
+    atualizarEDesenharFumaca(gl, programInfo.program, programInfo, viewProjectionMatrix, dt);
+    atualizarEDesenharAgua(gl, programInfo.program, programInfo, viewProjectionMatrix, dt);
 }
 //---------------------------------------------------------------
 // som fritura ao clicar no fogão
 //---------------------------------------------------------------
 
-// Converte as coordenadas do clique (Canvas) para um raio 3D no mundo
-// Converte as coordenadas do clique (Canvas) para um raio 3D no mundo
-function obterRaioDoClique(event, canvas, viewProjectionMatrix) {
-    const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / canvas.width) * 2 - 1;
-    const y = -((event.clientY - rect.top) / canvas.height) * 2 + 1;
-
-    // Usa twgl.m4 para inverter a matriz View-Projection
-    const invViewProj = twgl.m4.inverse(viewProjectionMatrix);
-    if (!invViewProj) return null;
-
-    // Transforma os pontos do Near Plane e Far Plane
-    const nearPoint = twgl.m4.transformPoint(invViewProj, [x, y, -1]);
-    const farPoint = twgl.m4.transformPoint(invViewProj, [x, y, 1]);
-
-    // Usa twgl.v3 para calcular a direção do raio
-    const direcao = twgl.v3.normalize(twgl.v3.subtract(farPoint, nearPoint));
-    return { origem: nearPoint, direcao };
-}
-
-// Teste de intersecção com a Bounding Box aproximada do forno
-function clicouNoForno(raio, posicaoForno, tamanhoForno) {
-    if (!raio) return false;
-
-    const min = twgl.v3.subtract(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
-    const max = twgl.v3.add(posicaoForno, twgl.v3.divScalar(tamanhoForno, 2));
-
-    let tmin = (min[0] - raio.origem[0]) / raio.direcao[0];
-    let tmax = (max[0] - raio.origem[0]) / raio.direcao[0];
-
-    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
-
-    let tymin = (min[1] - raio.origem[1]) / raio.direcao[1];
-    let tymax = (max[1] - raio.origem[1]) / raio.direcao[1];
-
-    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
-
-    if ((tmin > tymax) || (tymin > tmax)) return false;
-
-    if (tymin > tmin) tmin = tymin;
-    if (tymax < tmax) tmax = tymax;
-
-    let tzmin = (min[2] - raio.origem[2]) / raio.direcao[2];
-    let tzmax = (max[2] - raio.origem[2]) / raio.direcao[2];
-
-    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
-
-    if ((tmin > tzmax) || (tzmin > tmax)) return false;
-
-    return true;
-}
-// --- FUNÇÕES DE RAYCASTING PARA O CLIQUE NO FORNO ---
 
 export function verificarCliqueNoForno(event, canvas, viewProjectionMatrix) {
     // 1. Pega nas dimensões reais do elemento no ecrã (clientWidth)
@@ -491,4 +452,318 @@ export function verificarCliqueNoForno(event, canvas, viewProjectionMatrix) {
     if ((tmin > tzmax) || (tzmin > tmax)) return false;
 
     return true; // Acertou no fogão!
+}
+
+// --- PARTÍCULAS: utilidades compartilhadas (fumaça e água) --------------------
+
+const ATTR_POSICAO = 'position';
+const ATTR_VIDA = 'a_vida';
+ 
+function criarBufferParticulas(gl, posicoes, vidas) {
+    return twgl.createBufferInfoFromArrays(gl, {
+        pos:  { numComponents: 3, data: posicoes, drawType: gl.DYNAMIC_DRAW, attrib: ATTR_POSICAO },
+        vida: { numComponents: 1, data: vidas,    drawType: gl.DYNAMIC_DRAW, attrib: ATTR_VIDA },
+    });
+}
+ 
+function enviarEDesenharParticulas(gl, programInfo, shaderProgram, viewProjectionMatrix, bufferInfo, posicoes, vidas, cor, quantidade, tamanho, alfa, ventoFumaca = 0.0){
+    // Atualiza os buffers com as posições/vidas deste frame
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferInfo.attribs[ATTR_POSICAO].buffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, posicoes);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferInfo.attribs[ATTR_VIDA].buffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vidas);
+ 
+    const programa = shaderProgram || programInfo.program;
+    gl.useProgram(programa);
+ 
+    // Desliga atributos da malha anterior (normal/texcoord): se ficarem ligados
+    
+    const locNormal = gl.getAttribLocation(programa, 'normal');
+    const locTexcoord = gl.getAttribLocation(programa, 'texcoord');
+    if (locNormal >= 0) gl.disableVertexAttribArray(locNormal);
+    if (locTexcoord >= 0) gl.disableVertexAttribArray(locTexcoord);
+ 
+    gl.depthMask(false);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+ 
+     twgl.setUniforms(programInfo, {
+        u_matrix: viewProjectionMatrix,
+        u_ehParticula: 1.0,
+        u_corParticula: cor,
+        u_tamanhoParticula: tamanho,
+        u_alfaParticula: alfa,
+        u_ventoFumaca: ventoFumaca,
+    })
+ 
+    twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+    gl.drawArrays(gl.POINTS, 0, quantidade);
+ 
+    const locVida = gl.getAttribLocation(programa, ATTR_VIDA);
+    if (locVida >= 0) gl.disableVertexAttribArray(locVida);
+ 
+    gl.depthMask(true);
+     twgl.setUniforms(programInfo, { u_ehParticula: 0.0, u_ventoFumaca: 0.0 });
+}
+ 
+// --- SISTEMA DE PARTÍCULAS (Fumaça do Fogão) ---------------------------------
+let fumacaLigada = false;
+const numParticulas = 30;
+let posicoesParticulas = null;
+let vidasParticulas = null;
+let bufferInfoParticulas = null;
+const particulasDados = [];
+const FUMACA_DESLOC = [0.0, 0.0]
+ 
+const Y_INICIO_FUMACA = ALTURA_BANCADA + 0.55;
+ 
+export function alternarFumaca() {
+    fumacaLigada = !fumacaLigada;
+    console.log(`Fumaça: ${fumacaLigada ? 'LIGADA' : 'DESLIGADA'}`);
+    return fumacaLigada;
+}
+ 
+export function initFumaca(gl) {
+    posicoesParticulas = new Float32Array(numParticulas * 3);
+    vidasParticulas = new Float32Array(numParticulas);
+    particulasDados.length = 0;
+ 
+    const [bx, bz] = noFundo(1);
+    const fx = bx + FUMACA_DESLOC[0];
+    const fz = bz + FUMACA_DESLOC[1];
+ 
+    for (let i = 0; i < numParticulas; i++) {
+        particulasDados.push({
+            x: fx + (Math.random() - 0.5) * 0.3,
+            y: Y_INICIO_FUMACA + Math.random() * 0.5,
+            z: fz + (Math.random() - 0.5) * 0.3,
+            vx: (Math.random() - 0.5) * 0.15,   // unidades por SEGUNDO
+            vy: 0.25 + Math.random() * 0.25,
+            vz: (Math.random() - 0.5) * 0.15,
+            vida: Math.random(),
+            vidaMaxima: 1.5 + Math.random() * 1.5
+        });
+        posicoesParticulas[i * 3 + 0] = fx;
+        posicoesParticulas[i * 3 + 1] = Y_INICIO_FUMACA;
+        posicoesParticulas[i * 3 + 2] = fz;
+    }
+ 
+    bufferInfoParticulas = criarBufferParticulas(gl, posicoesParticulas, vidasParticulas);
+}
+ 
+// O último parâmetro é ignorado: quem controla é alternarFumaca().
+export function atualizarEDesenharFumaca(gl, shaderProgram, programInfo, viewProjectionMatrix, deltaTime) {
+    if (!fumacaLigada || !bufferInfoParticulas) return;
+ 
+    const [bx, bz] = noFundo(1);
+    const fx = bx + FUMACA_DESLOC[0];
+    const fz = bz + FUMACA_DESLOC[1];
+
+    for (let i = 0; i < numParticulas; i++) {
+        const p = particulasDados[i];
+        p.vida += deltaTime;
+        p.x += p.vx * deltaTime;
+        p.y += p.vy * deltaTime;
+        p.z += p.vz * deltaTime;
+ 
+        if (p.vida >= p.vidaMaxima || p.y > 2.2) {
+            p.vida = 0;
+            p.x = fx + (Math.random() - 0.5) * 0.3;
+            p.y = Y_INICIO_FUMACA;
+            p.z = fz + (Math.random() - 0.5) * 0.3;
+        }
+ 
+        posicoesParticulas[i * 3 + 0] = p.x;
+        posicoesParticulas[i * 3 + 1] = p.y;
+        posicoesParticulas[i * 3 + 2] = p.z;
+        vidasParticulas[i] = p.vida / p.vidaMaxima;
+    }
+ 
+    enviarEDesenharParticulas(gl, programInfo, shaderProgram, viewProjectionMatrix,
+    bufferInfoParticulas, posicoesParticulas, vidasParticulas, [0.9, 0.9, 0.9], numParticulas, 25.0, 0.6, 1.0);
+}
+ 
+// --- SISTEMA DE PARTÍCULAS DA ÁGUA (Pia / Torneira) --------------------------
+let torneiraLigada = false;
+const numGotas = 12;
+let posicoesGotas = null;
+let vidasGotas = null;
+let bufferInfoGotas = null;
+const gotasDados = [];
+let jatoBuffer = null;
+const RAIO_JATO = 0.018;
+const TORNEIRA_DESLOC = [-0.05, 0.0];
+
+ 
+const Y_INICIO_AGUA = ALTURA_BANCADA + 0.35; // altura da torneira
+const Y_FIM_AGUA = ALTURA_BANCADA;           // para na superfície da bancada
+ 
+export function alternarTorneira() {
+    torneiraLigada = !torneiraLigada;
+    if (torneiraLigada) {
+        tocarSom('agua');
+    } else {
+        pararSom('agua');
+    }
+    console.log(`Torneira: ${torneiraLigada ? 'LIGADA' : 'DESLIGADA'}`);
+    return torneiraLigada;
+}
+ 
+export function initAgua(gl) {
+    aguaPiaBuffer = twgl.primitives.createPlaneBufferInfo(gl, 1, 1, 24, 24);
+    jatoBuffer = twgl.primitives.createCylinderBufferInfo(gl, 1, 1, 12, 1); // raio 1, altura 1
+
+    posicoesGotas = new Float32Array(numGotas * 3);
+    vidasGotas = new Float32Array(numGotas);
+    gotasDados.length = 0;
+
+    const [px, pz] = posTorneira();
+
+    for (let i = 0; i < numGotas; i++) {
+        gotasDados.push({
+            x: px, y: Y_FUNDO_PIA, z: pz,
+            vx: 0, vy: 0, vz: 0,
+            vida: Math.random(),
+            vidaMaxima: 0.6
+        });
+        posicoesGotas[i * 3 + 0] = px;
+        posicoesGotas[i * 3 + 1] = Y_FUNDO_PIA;
+        posicoesGotas[i * 3 + 2] = pz;
+    }
+
+    bufferInfoGotas = criarBufferParticulas(gl, posicoesGotas, vidasGotas);
+}
+
+
+export function atualizarEDesenharAgua(gl, shaderProgram, programInfo, viewProjectionMatrix, deltaTime) {
+    if (!torneiraLigada || !bufferInfoGotas) return;
+
+    const [px, pz] = posTorneira();
+    const yAgua = yFimAgua();
+
+    for (let i = 0; i < numGotas; i++) {
+        const g = gotasDados[i];
+        g.vida += deltaTime;
+        g.vy -= 3.0 * deltaTime;           // gravidade
+        g.x += g.vx * deltaTime;
+        g.y += g.vy * deltaTime;
+        g.z += g.vz * deltaTime;
+
+        if (g.vida >= g.vidaMaxima || (g.y < yAgua && g.vida > 0.05)) {
+            g.vida = 0;
+            g.vidaMaxima = 0.4 + Math.random() * 0.3;
+            g.x = px + (Math.random() - 0.5) * 0.03;
+            g.y = yAgua;
+            g.z = pz + (Math.random() - 0.5) * 0.03;
+            g.vx = (Math.random() - 0.5) * 0.35;
+            g.vy = 0.5 + Math.random() * 0.4;
+            g.vz = (Math.random() - 0.5) * 0.35;
+        }
+
+        posicoesGotas[i * 3 + 0] = g.x;
+        posicoesGotas[i * 3 + 1] = g.y;
+        posicoesGotas[i * 3 + 2] = g.z;
+        vidasGotas[i] = g.vida / g.vidaMaxima;
+    }
+
+    enviarEDesenharParticulas(gl, programInfo, shaderProgram, viewProjectionMatrix,
+        bufferInfoGotas, posicoesGotas, vidasGotas, [0.6, 0.8, 1.0], numGotas, 4.0, 0.9, 0.0);
+}
+
+// --- ÁGUA NA PIA ---------------------------------------------------------------
+// Ajuste estes valores até casar com a cuba do kitchencounter_sink.obj
+const PIA_LARGURA_X = 0.55;      // tamanho da cuba no eixo X do mundo
+const PIA_LARGURA_Z = 0.8;       // tamanho da cuba no eixo Z do mundo
+const PIA_DESLOC = [0.0, 0.0];   // deslocamento [x, z] da cuba em relação ao centro da célula
+const Y_FUNDO_PIA = ALTURA_BANCADA - 0.15;  // fundo da cuba
+const Y_TOPO_PIA  = ALTURA_BANCADA - 0.03;  // nível máximo (um pouco abaixo da borda)
+
+const TEMPO_ENCHER   = 3.0;  // s para encher, com a torneira aberta
+const TEMPO_CHEIA    = 4.0;  // s que fica cheia depois de fechar a torneira
+const TEMPO_ESVAZIAR = 3.0;  // s para esvaziar
+
+let nivelPia = 0;        // 0 = vazia, 1 = cheia
+let tempoParada = 0;     // tempo desde que a torneira foi fechada
+let aguaPiaBuffer = null;
+
+// Posição da boca da torneira (ajuste TORNEIRA_DESLOC)
+function posTorneira() {
+    const [bx, bz] = noLado(1);
+    return [bx + TORNEIRA_DESLOC[0], bz + TORNEIRA_DESLOC[1]];
+}
+
+function yFimAgua() {
+    // As gotas param na superfície da água (ou no fundo da cuba se estiver vazia)
+    return Y_FUNDO_PIA + nivelPia * (Y_TOPO_PIA - Y_FUNDO_PIA);
+}
+
+function atualizarNivelPia(dt) {
+    if (torneiraLigada) {
+        tempoParada = 0;
+        nivelPia = Math.min(1, nivelPia + dt / TEMPO_ENCHER);
+    } else if (nivelPia > 0) {
+        tempoParada += dt;
+        if (tempoParada > TEMPO_CHEIA) {
+            nivelPia = Math.max(0, nivelPia - dt / TEMPO_ESVAZIAR);
+        }
+    }
+}
+ 
+function desenharAguaPia(gl, programInfo, viewProjectionMatrix) {
+    const [px, pz] = posTorneira();
+    const yAgua = yFimAgua();
+
+    gl.depthMask(false);
+
+    // Jato: cilindro fino da boca da torneira até a superfície da água
+    if (torneiraLigada && jatoBuffer) {
+        const altura = Y_INICIO_AGUA - yAgua;
+        if (altura > 0) {
+            let w = m4.translation([px, yAgua + altura / 2, pz]);
+            w = m4.scale(w, [RAIO_JATO, altura, RAIO_JATO]);
+            desenharObjeto(gl, programInfo, viewProjectionMatrix, w, jatoBuffer,
+                [0.55, 0.78, 1.0, 0.55], false);
+        }
+    }
+
+    // Superfície da água na pia (ondula com o vento)
+    if (nivelPia > 0 && aguaPiaBuffer) {
+        const [cx, cz] = noLado(1);
+        let w = m4.translation([cx + PIA_DESLOC[0], yAgua, cz + PIA_DESLOC[1]]);
+        w = m4.scale(w, [PIA_LARGURA_X, 1, PIA_LARGURA_Z]);
+        desenharObjeto(gl, programInfo, viewProjectionMatrix, w, aguaPiaBuffer,
+            [0.3, 0.6, 0.9, 0.6], false, { u_ehAgua: 1 });
+    }
+
+     gl.depthMask(true);
+    twgl.setUniforms(programInfo, { u_ehAgua: 0 });
+}
+
+// --- VIDRO (semitransparente) --------------------------------------------------
+const ALTURA_MESA = 0.6;                       // altura do tampo da mesa (ajuste se precisar)
+const COR_VIDRO = [0.75, 0.9, 1.0, 0.28];      // o 4º valor é a transparência
+let redomaBuffer = null;
+let copoBuffer = null;
+
+
+export function desenharCopo(gl, programInfo, viewProjectionMatrix) {
+    if (!copoBuffer) return;
+
+    const [bx, bz] = noFundo(2);
+    let mCopo = m4.translation([bx + 0.5, ALTURA_BANCADA + 0.09, bz + -0.5]);
+    mCopo = m4.scale(mCopo, [0.07, 0.18, 0.07]); // largura, altura, profundidade
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);     // transparente não escreve no z-buffer
+    gl.enable(gl.CULL_FACE);
+
+    // Duas passadas: primeiro as faces de trás, depois as da frente
+    for (const face of [gl.FRONT, gl.BACK]) {
+        gl.cullFace(face);
+        desenharObjeto(gl, programInfo, viewProjectionMatrix, mCopo, copoBuffer, COR_VIDRO, false);
+    }
+
+    gl.disable(gl.CULL_FACE);
+    gl.depthMask(true);
 }

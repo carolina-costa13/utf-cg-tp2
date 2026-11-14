@@ -2,9 +2,9 @@ import { mat4 } from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/esm/index.js'
 import { tocarSom } from './audio.js';
 
 const poses = [
-    { translation: [1.05, 0.3, 2.4], rotationY: Math.PI, scale: [25, 25, 25] },         // Gato 1 (Perto da mesa)
-    { translation: [1.95, 1.7, -1.3], rotationY: -Math.PI / 4, scale: [0.1, 0.1, 0.1] },    // Gato 2 (Geladeira)
-    { translation: [-1.95, 1.3, -1.3], rotationY: Math.PI / 4, scale: [0.6, 0.6, 0.6] }     // Gato 3 (Bancada)
+    { translation: [1.5, 0.01, 2.3], rotationY: -Math.PI / 4, scale: [0.11, 0.11, 0.11] },    // Gato 1 (Agora em cima da geladeira)
+    { translation: [1.7, 1.95, -1.3], rotationY: Math.PI, scale: [25, 25, 25] },        // Gato 2 (Agora perto da mesa)
+    { translation: [-1.95, 1.1, -1.3], rotationY: Math.PI / 4, scale: [0.6, 0.6, 0.6] }     // Gato 3 (Bancada - mantém-se igual)
 ];
 
 let currentPoseIndex = 0;

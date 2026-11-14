@@ -10,6 +10,8 @@ const sons = {
     fritura: new Audio('./soundEffects/freesound_community-frying-food-24399.mp3'),
     fornoFechar: new Audio('./soundEffects/freesound_community-oven-door-close-10-feet_wav-44919.mp3'),
     fornoAbrir: new Audio('./soundEffects/freesound_community-oven-door-open-2-inches-44921.mp3'),
+    agua: new Audio('./soundEffects/allyinnature-running-stream-water-sound-239612.mp3'),
+    incendioAlarme: new Audio('./soundEffects/freesound_community-fire-alarm-33770.mp3')
 
 };
 
@@ -19,6 +21,7 @@ sons.miado.volume = 0.1;
 sons.geladeiraAlarme.volume = 0.2;
 sons.geladeiraAlarme.loop = true;
 sons.fritura.volume= 0.2;
+sons.agua.volume = 0.1;
 
 // Pré-carrega todos os sons para evitar atrasos
 Object.values(sons).forEach(som => {
@@ -43,3 +46,23 @@ export function pararSom(nome) {
         som.currentTime = 0; // Volta ao início para a próxima vez
     }
 }
+
+// --- Ventilador: ambiente contínuo, respeitando o bloqueio de autoplay ---
+let ventiladorIniciado = false;
+
+function iniciarVentilador() {
+    if (ventiladorIniciado) return;
+    sons.ventilador.play()
+        .then(() => {
+            ventiladorIniciado = true;
+            window.removeEventListener('click', iniciarVentilador);
+            window.removeEventListener('keydown', iniciarVentilador);
+            window.removeEventListener('touchstart', iniciarVentilador);
+        })
+        .catch(() => { /* bloqueado: tenta de novo na próxima interação */ });
+}
+
+iniciarVentilador(); // tenta já (funciona se o navegador permitir)
+window.addEventListener('click', iniciarVentilador);
+window.addEventListener('keydown', iniciarVentilador);
+window.addEventListener('touchstart', iniciarVentilador)

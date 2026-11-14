@@ -2,7 +2,7 @@ body {
     margin: 0;
     overflow: hidden;
     background-color: #111;
-    font-family: sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 canvas {
@@ -11,32 +11,167 @@ canvas {
     display: block;
 }
 
-#info {
+/* Painel de Instruções */
+.painel-instrucoes {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    color: white;
-    background: rgba(61, 61, 61, 0.6);
-    padding: 10px;
-    border-radius: 10px;
-    pointer-events: none;
+    top: 20px;
+    left: 20px;
+    width: 320px;
+    background: rgba(24, 28, 26, 0.92); /* Verde-escuro escovado profundo */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(205, 127, 50, 0.5); /* Borda em tom de cobre/madeira queimada */
+    border-radius: 12px;
+    padding: 20px;
+    color: #f3f4f6; /* Branco suave para excelente leitura */
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+    z-index: 100;
+    pointer-events: auto;
+    user-select: none;
 }
 
+.painel-cabecalho {
+    border-bottom: 1px solid rgba(205, 127, 50, 0.4);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.painel-cabecalho h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #e67e22; /* Laranja forte idêntico ao forno */
+}
+
+.painel-cabecalho .subtitulo {
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.grupo-instrucoes {
+    margin-bottom: 12px;
+}
+
+.categoria-titulo {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #2ecc71; /* Verde-esmeralda vivo que remete ao frigorífico */
+    margin-bottom: 6px;
+    font-weight: bold;
+}
+
+.painel-instrucoes p {
+    margin: 6px 0;
+    font-size: 0.85rem;
+    color: #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.painel-instrucoes b {
+    background: rgba(230, 126, 34, 0.25); /* Fundo de tecla cor de cobre/laranja */
+    padding: 3px 7px;
+    border-radius: 6px;
+    color: #f39c12;
+    font-family: monospace;
+    font-size: 0.88rem;
+    border: 1px solid rgba(230, 126, 34, 0.5);
+    min-width: 18px;
+    text-align: center;
+}
+
+.painel-instrucoes p span {
+    text-align: right;
+    color: #9ca3af;
+    font-size: 0.78rem;
+    max-width: 180px;
+}
+
+/* Balão do Gato */
 #balao-gato {
     position: absolute;
-    top: 20%;
+    bottom: 40px;
     left: 50%;
-    transform: translateX(-50%) scale(0);
+    transform: translateX(-50%) translateY(20px);
     background: white;
-    padding: 8px 16px;
+    color: #333;
+    padding: 10px 20px;
     border-radius: 20px;
     font-family: sans-serif;
     font-weight: bold;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    transition: transform 0.3s ease-in-out;
-    pointer-events: none; /* Para não bloquear cliques */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1000;
 }
 
 #balao-gato.visivel {
-    transform: translateX(-50%) scale(1);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Alarme do Fogão */
+.alarme-aviso {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(239, 68, 68, 0.9);
+    color: white;
+    padding: 10px 20px;
+    font-weight: bold;
+    font-family: sans-serif;
+    border-radius: 8px;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    animation: piscar 0.8s infinite alternate;
+}
+
+.alarme-aviso.visivel {
+    display: block;
+}
+
+@keyframes piscar {
+    from { opacity: 0.5; transform: translateX(-50%) scale(0.98); }
+    to { opacity: 1; transform: translateX(-50%) scale(1.02); }
+}
+
+.aviso-camera {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(15px);
+    background: rgba(24, 28, 26, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(205, 127, 50, 0.5);
+    color: #f3f4f6;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 100;
+    white-space: nowrap;
+}
+
+.aviso-camera.visivel {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.aviso-camera b {
+    background: rgba(230, 126, 34, 0.25);
+    color: #f39c12;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    border: 1px solid rgba(230, 126, 34, 0.5);
 }

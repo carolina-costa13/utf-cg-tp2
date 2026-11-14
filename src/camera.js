@@ -11,9 +11,90 @@ export function ajustarZoom(delta) {
     zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 }
 
+// --- Estado da Câmara Livre (Tipo 3) ---
+let posicaoCamera = [0.0, 2.0, 6.0];
+let yaw = Math.PI; 
+let pitch = -0.2; 
+const sensibilidadeMouse = 0.002;
+const velocidadeMovimento = 3.0;
+const teclasPressionadas = {};
+
+let tipoCameraAtual = 1;
+let mouseOlharAtivo = false;
+let canvasReferencia = null; // Guardamos a referência do canvas passada pela função de matrizes
+
+window.addEventListener('keydown', (e) => {
+    teclasPressionadas[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    teclasPressionadas[e.key.toLowerCase()] = false;
+});
+
+// Apenas UM listener de mousedown limpo e unificado
+window.addEventListener('mousedown', (e) => {
+    if (tipoCameraAtual === 3 && e.button === 0) {
+        mouseOlharAtivo = !mouseOlharAtivo;
+        
+        if (mouseOlharAtivo && canvasReferencia) {
+            canvasReferencia.requestPointerLock();
+        } else {
+            document.exitPointerLock();
+        }
+    }
+});
+
+window.addEventListener('mousemove', (e) => {
+    // Se estivermos na câmara 3 e o olhar ativo, ou se o pointer lock estiver ganho pelo navegador
+    if (tipoCameraAtual === 3 && (mouseOlharAtivo || document.pointerLockElement)) {
+        yaw -= e.movementX * sensibilidadeMouse;
+        pitch -= e.movementY * sensibilidadeMouse;
+
+        const limitePitch = Math.PI / 2 - 0.01;
+        pitch = Math.max(-limitePitch, Math.min(limitePitch, pitch));
+    }
+});
+
+function atualizarCameraLivre(deltaTime) {
+    // Vetores de direção com base no Yaw e Pitch
+    const frente = [
+        Math.cos(pitch) * Math.sin(yaw),
+        Math.sin(pitch),
+        Math.cos(pitch) * Math.cos(yaw)
+    ];
+    const direita = [
+        Math.cos(yaw),
+        0,
+        -Math.sin(yaw)
+    ];
+
+    const mov = velocidadeMovimento * deltaTime;
+    if (teclasPressionadas['w']) {
+        posicaoCamera[0] += frente[0] * mov;
+        posicaoCamera[1] += frente[1] * mov;
+        posicaoCamera[2] += frente[2] * mov;
+    }
+    if (teclasPressionadas['s']) {
+        posicaoCamera[0] -= frente[0] * mov;
+        posicaoCamera[1] -= frente[1] * mov;
+        posicaoCamera[2] -= frente[2] * mov;
+    }
+    if (teclasPressionadas['d']) {
+        posicaoCamera[0] -= direita[0] * mov;
+        posicaoCamera[2] -= direita[2] * mov;
+    }
+    if (teclasPressionadas['a']) {
+        posicaoCamera[0] += direita[0] * mov;
+        posicaoCamera[2] += direita[2] * mov;
+    }
+}
+
+
 // Essa função recebe qual câmera usar, o ângulo de rotação e o canvas, e devolve 
 // uma única matriz que leva um ponto do mundo direto para a tela
-export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas){
+export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, deltaTime = 0){
+    tipoCameraAtual = tipoCamera;
+    canvasReferencia = canvas; // Guarda a referência do canvas
      // Sem isso, a cena ficaria esticada quando a janela não é quadrada.
      // a = largura/altura.
     const aspect = canvas.clientWidth / canvas.clientHeight;
@@ -47,12 +128,30 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas){
         const target = [0, 0, 0];
         const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
-    } else {
+
+    } else if (tipoCamera === 2) {
         // Câmera 2: vista superior olhando para baixo
         const eye = [0, 8, 0.01];
         const target = [0, 0, 0];
         const up = [0, 0, -1];
         cameraMatrix = m4.lookAt(eye, target, up);
+
+    } else if (tipoCamera === 3) {
+        // Câmera 3: Navegação livre (WASD)
+        atualizarCameraLivre(deltaTime);
+
+        const frente = [
+            Math.cos(pitch) * Math.sin(yaw),
+            Math.sin(pitch),
+            Math.cos(pitch) * Math.cos(yaw)
+        ];
+        const target = [
+            posicaoCamera[0] + frente[0],
+            posicaoCamera[1] + frente[1],
+            posicaoCamera[2] + frente[2]
+        ];
+        const up = [0, 1, 0];
+        cameraMatrix = m4.lookAt(posicaoCamera, target, up);
     }
  
     // m4.lookAt devolve a matriz de MUNDO da câmera.

@@ -3,32 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paraíso Pokémon - Diorama 3D</title>
-    <!-- Importa o arquivo CSS externo -->
+    <title>Paraíso do Gato - Diorama 3D</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="info">
-        <h3>Paraíso Pokémon (Trabalho Prático)</h3>
-        <p>Pressione <b>1</b> ou <b>2</b> para trocar de câmera.</p>
-        <p>Pressione <b>P</b> para mudar a pose do personagem.</p>
-        <p>Pressione <b>L</b> para ligar/desligar a luz.</p>
-        <p>Pressione <b>O</b> para abrir/fechar todas as portas.</p>
-        <p>Pressione <b>T</b> para abrir/fechar o frizer.</p>
-        <p>Pressione <b>B</b> para abrir/fechar a geladeira.</p>
-        <p>Pressione <b>F</b> para abrir/fechar o forno.</p>
-        <p>Pressione <b>N</b> para ativar o efeito neblina.</p>
-        <p>Pressione <b>V</b> para ativar o efeito vento.</p>
+    <div id="info" class="painel-instrucoes">
+        <div class="painel-cabecalho">
+            <h3> Paraíso do Gato</h3>
+            <span class="subtitulo">Trabalho Prático 3D</span>
+        </div>
+        
+        <div class="grupo-instrucoes">
+            <span class="categoria-titulo">Câmeras & Movimento</span>
+            <p><b>1, 2, 3</b> <span>1: Órbita | 2: Topo | 3: Livre</span></p>
+        </div>
+
+        <div class="grupo-instrucoes">
+            <span class="categoria-titulo">Interações & Cozinha</span>
+            <p><b>Clique</b> <span>Ligar forno / Carinho no gato</span></p>
+            <p><b>G</b> <span>Abrir / Fechar torneira</span></p>
+            <p><b>T / B / F</b> <span>Frizer / Geladeira / Forno</span></p>
+        </div>
+
+        <div class="grupo-instrucoes">
+            <span class="categoria-titulo">Outros Comandos</span>
+            <p><b>O</b> <span>Abrir / Fechar portas</span></p>
+            <p><b>P</b> <span>Mudar pose do personagem</span></p>
+            <p><b>L</b> <span>Ligar / Desligar luz</span></p>
+        </div>
+
+        <div class="grupo-instrucoes">
+            <span class="categoria-titulo">Efeitos Ambientais</span>
+            <p><b>N</b> <span>Ativar / Desativar Neblina</span></p>
+            <p><b>V</b> <span>Ativar / Desativar Vento</span></p>
+        </div>
     </div>
 
     <canvas id="canvas"></canvas>
 
+    <!-- Elementos dinâmicos -->
+    <div id="balao-gato" class="balao-escondido">🐱 Purr... ❤️</div>
+    <div id="alarme-fogao" class="alarme-aviso">⚠️ ALARME: FOGÃO LIGADO HÁ MUITO TEMPO! ⚠️</div>
+    <div id="aviso-camera-livre" class="aviso-camera">
+    🖱️ <b>Clique</b> para olhar · <b>WASD</b> para voar · <b>ESC</b> para soltar o cursor · <b>1 / 2</b> para trocar de câmera
+</div>
+
     <!-- Importa a biblioteca TWGL.js via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/twgl.js/5.5.0/twgl-full.min.js"></script>
-    
     <script type="module" src="main.js"></script>
-    <div id="balao-gato" class="balao-escondido">🐱 Purr... ❤️</div>
     
 </body>
 </html>
