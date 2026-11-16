@@ -1,6 +1,6 @@
 // main.js
 import { initCenario, desenharCenario, alternarPorta, verificarCliqueNoForno, alternarTorneira, alternarFumaca, desenharCopo } from './src/cenario.js';
-import { calcularMatrizesCamera, ajustarZoom} from './src/camera.js';
+import { calcularMatrizesCamera, ajustarZoom, girarOrbital, posicaoOlho} from './src/camera.js';
 import { criarIluminacao } from './src/iluminacao.js';
 import { initGatos, desenharGatos, verificarCliqueNoGato} from './src/personagem.js';
 import { tocarSom, pararSom} from './src/audio.js';
@@ -14,6 +14,7 @@ let torneiraLigada = false;
 let tempoFornoLigado = null;
 const TEMPO_LIMITE_NEBLINA = 10000;
 let intensidadeNeblina = 0.0;
+let luzLigada = true;   // tecla L liga/desliga a luminária
 
 const avisoCamera = document.getElementById('aviso-camera-livre');
 const canvas = document.getElementById("canvas");
@@ -106,6 +107,15 @@ const fsSource = `
     uniform vec3 u_corParticula;
     uniform float u_alfaParticula;
 
+    uniform vec4 u_corAmbiente;
+    uniform vec4 u_corDirecional;
+    uniform vec4 u_corLuz;
+    uniform vec3 u_luzPosicao;
+    uniform vec3 u_atenuacao;
+    uniform vec3 u_posCamera;
+    uniform float u_emissivo;
+    uniform float u_luzLigada;
+
     varying vec3 v_normal;
     varying vec2 v_texcoord;
     varying vec3 v_posMundo;
@@ -129,9 +139,31 @@ const fsSource = `
                 base = mix(u_color, u_color2, par);
             }
 
+            //--------- LUZ -----------
             vec3 n = normalize(v_normal);
-            float luz = max(dot(n, normalize(u_luzDirecao)), 0.0);
-            vec3 corFinal = base.rgb * (0.35 + 0.65 * luz);
+            vec3 v = normalize(u_posCamera - v_posMundo);   // ponto -> câmera
+
+            // Ambiente global + direcional fraca (preenchimento)
+            vec3 cor = u_corAmbiente.rgb;
+            cor += u_corDirecional.rgb * max(dot(n, normalize(u_luzDirecao)), 0.0);
+
+            // Luz pontual da luminária, com atenuação
+            vec3 aoLuz = u_luzPosicao - v_posMundo;
+            float d = length(aoLuz);
+            vec3 l = aoLuz / d;
+            float aten = 1.0 / (u_atenuacao.x + u_atenuacao.y * d + u_atenuacao.z * d * d);
+
+            float difusa = max(dot(n, l), 0.0);
+            cor += u_corLuz.rgb * aten * difusa * u_luzLigada;
+
+            // Especular de Phong
+            vec3 especular = vec3(0.0);
+            if (difusa > 0.0) {
+                vec3 r = reflect(-l, n);
+                especular = u_corLuz.rgb * aten * 0.3 * pow(max(dot(r, v), 0.0), 32.0) * u_luzLigada;
+            }
+
+            vec3 corFinal = base.rgb * (cor + u_emissivo * u_luzLigada) + especular;
 
             // --- MELHORIA DE CORES ---
             // Aumenta ligeiramente a saturação e o contraste para as cores saltarem à vista
@@ -183,7 +215,8 @@ window.addEventListener('keydown', (event) => {
         case 'f': alternarPorta('forno'); break;
         case 'v': ventoLigado = !ventoLigado; break;
         case 'n': neblinaLigada = !neblinaLigada; break;
-        case 'g': alternarTorneira(); break; break;
+        case 'g': alternarTorneira(); break; 
+        case 'l': luzLigada = !luzLigada; break;
     }
 });
 
@@ -301,6 +334,17 @@ function render(time) {
     }
 
     const viewProjectionMatrix = calcularMatrizesCamera(tipoCamera, cameraRotation, gl.canvas, deltaTime);
+
+    twgl.setUniforms(programInfo, {
+        u_luzLigada: luzLigada ? 1.0 : 0.0,
+        u_corAmbiente: iluminacao.corAmbiente,
+        u_corDirecional: iluminacao.corDirecional,
+        u_corLuz: iluminacao.corLuz,
+        u_atenuacao: iluminacao.atenuacao,
+        u_posCamera: posicaoOlho,
+    });
+
+
     ultimaMatrizViewProj = viewProjectionMatrix;
     desenharCenario(gl, programInfo, viewProjectionMatrix, time);
     desenharGatos(gl, programInfo, viewProjectionMatrix, iluminacao);

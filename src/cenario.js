@@ -1,6 +1,6 @@
 // src/cenario.js
 import { carregarModeloOBJ } from './carregaObjetos.js';
-import { initVentilador, desenharVentiladorTeto } from './ventilador.js';
+import { initVentilador, desenharVentiladorTeto, posicaoLuminaria} from './ventilador.js';
 import { tocarSom, pararSom } from './audio.js';
 
 let tempoGeladeiraAberta = 0;
@@ -56,6 +56,9 @@ const COR_DOMO_CIMA  = [228 / 255, 199 / 255, 170 / 255, 1.0];  // bege do KayKi
 
 const MESA = { x: 0.65, z: 0.85 };
 const DIST_CADEIRA = 1.1; // distância do centro da mesa ao centro da cadeira
+
+const POSICAO_VENTILADOR = [0, RAIO_DOMO - 0.1, 0];
+const ESCALA_VENTILADOR = 0.8;
 
 let diskBuffer = null;
 let meiaEsferaBuffer = null; // hemisfério inferior, logo abaixo do chão
@@ -288,6 +291,8 @@ function desenharObjeto(gl, programInfo, viewProjectionMatrix, worldMatrix, buff
 export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
     if (!diskBuffer || !meiaEsferaBuffer) return;
 
+    twgl.setUniforms(programInfo, { u_luzPosicao: posicaoLuminaria(POSICAO_VENTILADOR, ESCALA_VENTILADOR) });
+
     const branco = [1, 1, 1, 1];
 
     // --- A. MEIA ESFERA LOGO ABAIXO DO CHÃO ---
@@ -395,7 +400,7 @@ export function desenharCenario(gl, programInfo, viewProjectionMatrix, time) {
         */
 
     desenharVentiladorTeto(gl, programInfo, viewProjectionMatrix, time,
-        [0, RAIO_DOMO - 0.1, 0], 0.8);   
+        POSICAO_VENTILADOR, ESCALA_VENTILADOR); 
 
      // PARTÍCULAS (sempre por último, por causa da transparência) ---
     atualizarNivelPia(dt);

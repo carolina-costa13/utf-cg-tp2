@@ -1,5 +1,8 @@
+
 // src/camera.js
 const m4 = twgl.m4;
+
+export let posicaoOlho = [0, 0, 0];   // onde o olho está no mundo (usado na luz especular)
 
 // Zoom da câmera 1: 1 = distância original, menor = perto, maior = longe
 let zoom = 1;
@@ -138,13 +141,16 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, delta
         //    |-> arctan(6/6) = 45° (ângulo de visão)
         const eye = [Math.cos(cameraRotation) * 6 * zoom, 6 * zoom, Math.sin(cameraRotation) * 6 * zoom]
 
+        // a própria posição da câmera livre é o olho
+        posicaoOlho = [...posicaoCamera];
+
         // A câmera olha sempre para a origem (o centro do diorama). 
         // O up diz qual direção é “para cima” na tela.
 
         const target = [0, 0, 0];
         const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
-    } /*else {
+    } else if (tipoCamera === 2) {
         // Câmera 2: vista superior olhando para baixo. É uma órbita 
         // controlada pelo mouse, alvo fixo no centro. A câmera tem 
         // sua posição numa esfera de raio RAIO_ORBITAL (fórmula dascoordenadas 
@@ -155,17 +161,26 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, delta
             Math.cos(alturaDaCamera) * Math.sin(giroHorizontal) * RAIO_ORBITAL
         ];
 
-    }*/ else if (tipoCamera === 2) {
-        // Câmera 2: vista superior olhando para baixo
+        posicaoOlho = [...posicaoCamera];
+
+        const target = [0, 0, 0]; // sempre olhando para o centro do diorama
+        const up = [0, 1, 0];     // o eixo Y é "para cima" na tela
+        cameraMatrix = m4.lookAt(eye, target, up);
+
+    }  /*else if (tipoCamera === 2) {
+        // Câmera 2: vista superior olhando para baixo - parada, não dá pra mexer com o mouse.
         const eye = [0, 8, 0.01];
+        posicaoOlho = [...posicaoCamera];
         const target = [0, 0, 0];
         const up = [0, 1, 0];
         cameraMatrix = m4.lookAt(eye, target, up);
 
-    } else if (tipoCamera === 3) {
+    }*/ else if (tipoCamera === 3) {
         // Câmera 3: Navegação livre (WASD)
         atualizarCameraLivre(deltaTime);
 
+        posicaoOlho = [...posicaoCamera];
+        
         const frente = [
             Math.cos(pitch) * Math.sin(yaw),
             Math.sin(pitch),

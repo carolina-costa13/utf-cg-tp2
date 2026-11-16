@@ -23,12 +23,18 @@ const prim = twgl.primitives;
 // Aqui vamos guardar as formas (geometrias) depois de criadas
 let formas = null;
  
-// ---------- MEDIDAS (mude à vontade!) ----------
+// ---------- MEDIDAS DO VENTILADOR (mude à vontade!) ----------
 const ALTURA_POSTE = 4.0;     // altura do poste
 const COMPRIMENTO_BRACO = 2.0; // quanto o braço sai do poste
 const ALTURA_HASTE = 0.5;     // pedacinho que desce do braço até o motor
 const COMPRIMENTO_PA = 1.2;   // tamanho de cada pá
 const NUMERO_DE_PAS = 4;
+
+// ---------- LUMINÁRIA DO VENTILADOR ----------
+const Y_LAMPADA = -1.45;                 // altura local do centro da lâmpada (abaixo das pás)
+const RAIO_LAMPADA = 0.14;
+const COR_LAMPADA = [1.0, 0.92, 0.75, 1];
+const COR_BASE_LAMPADA = [0.55, 0.55, 0.6, 1];   // metal acinzentado
  
 // ---------- CORES [vermelho, verde, azul, opacidade] (0 a 1) ----------
 const COR_POSTE = [0.4, 0.4, 0.45, 1];
@@ -50,6 +56,9 @@ export function initVentilador(gl) {
  
         // cubo de tamanho 1. Depois a gente estica ele (scale) pra virar braço ou pá
         cubo: prim.createCubeBufferInfo(gl, 1),
+        lampada: prim.createSphereBufferInfo(gl, RAIO_LAMPADA, 16, 12),
+                // tronco de cone: (gl, raioEmbaixo, raioEmCima, altura, lados, fatias, tampaCima, tampaBaixo)
+        baseLampada: prim.createTruncatedConeBufferInfo(gl, 0.12, 0.0, 0.3, 24, 1, true, true),
     };
 }
 
@@ -185,8 +194,9 @@ export function desenharVentiladorTeto(gl, programInfo, viewProjection, time,
     let raiz = m4.translation(posicao);
     raiz = m4.scale(raiz, [escala, escala, escala]);
  
-    // 1) CANOPLA: disco achatado colado no teto (fixo)
-    const canopla = m4.translate(raiz, [0, -0.125, 0]);
+    const ALTURA_CANOPLA = 0.4;   // 1 = altura original, menor = mais baixa
+    let canopla = m4.translate(raiz, [0, -0.125 * ALTURA_CANOPLA, 0]);
+    canopla = m4.scale(canopla, [1, ALTURA_CANOPLA, 1]);
     desenharParte(gl, programInfo, viewProjection, formas.motor, canopla, COR_POSTE);
  
     // 2) HASTE: desce do teto (fixa). Mais comprida que a do poste.
@@ -202,4 +212,28 @@ export function desenharVentiladorTeto(gl, programInfo, viewProjection, time,
  
     // 4) Hélice: gira, igual ao outro modo
     desenharHelice(gl, programInfo, viewProjection, motor, angulo);
+
+    // 5) LUMINÁRIA: base (soquete) + borda arredondada + lâmpada (fixas, não giram com o rotor)
+
+    // Base: tronco de cone, estreita em cima (colada no motor) e larga embaixo.
+    // Vai de y = -1.05 (fundo do motor) até y = -1.35.
+    const baseLum = m4.translate(raiz, [0, -1.2, 0]);
+    desenharParte(gl, programInfo, viewProjection, formas.baseLampada, baseLum, COR_BASE_LAMPADA);
+
+    // Borda arredondada: uma esfera achatada (esticada em X/Z, espremida em Y) no fim da base
+    let borda = m4.translate(raiz, [0, -1.35, 0]);
+    borda = m4.scale(borda, [1.25, 0.45, 1.25]);
+    desenharParte(gl, programInfo, viewProjection, formas.lampada, borda, COR_BASE_LAMPADA);
+
+    // A lâmpada é EMISSIVA: liga u_emissivo só para ela e desliga logo depois,
+    // porque uniform fica "grudado" entre um desenho e outro.
+    const lampada = m4.translate(raiz, [0, Y_LAMPADA, 0]);
+    twgl.setUniforms(programInfo, { u_emissivo: 1 });
+    desenharParte(gl, programInfo, viewProjection, formas.lampada, lampada, COR_LAMPADA);
+    twgl.setUniforms(programInfo, { u_emissivo: 0 });
+}
+
+// Posição da lâmpada NO MUNDO (é daqui que sai a luz principal)
+export function posicaoLuminaria(posicao = [0, 5, 0], escala = 1) {
+    return [posicao[0], posicao[1] + Y_LAMPADA * escala, posicao[2]];
 }
