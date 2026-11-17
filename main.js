@@ -15,6 +15,7 @@ let tempoFornoLigado = null;
 const TEMPO_LIMITE_NEBLINA = 10000;
 let intensidadeNeblina = 0.0;
 let luzLigada = true;   // tecla L liga/desliga a luminária
+let modeloLigado = true; 
 
 const avisoCamera = document.getElementById('aviso-camera-livre');
 const canvas = document.getElementById("canvas");
@@ -115,6 +116,8 @@ const fsSource = `
     uniform vec3 u_posCamera;
     uniform float u_emissivo;
     uniform float u_luzLigada;
+    uniform float u_modeloLigado;
+    uniform float u_brilho;
 
     varying vec3 v_normal;
     varying vec2 v_texcoord;
@@ -144,8 +147,9 @@ const fsSource = `
             vec3 v = normalize(u_posCamera - v_posMundo);   // ponto -> câmera
 
             // Ambiente global + direcional fraca (preenchimento)
-            vec3 cor = u_corAmbiente.rgb;
-            cor += u_corDirecional.rgb * max(dot(n, normalize(u_luzDirecao)), 0.0);
+            float nivelBase = mix(0.25, 1.0, u_luzLigada);
+            vec3 cor = u_corAmbiente.rgb * nivelBase;
+            cor += u_corDirecional.rgb * max(dot(n, normalize(u_luzDirecao)), 0.0) * nivelBase;
 
             // Luz pontual da luminária, com atenuação
             vec3 aoLuz = u_luzPosicao - v_posMundo;
@@ -165,6 +169,8 @@ const fsSource = `
 
             vec3 corFinal = base.rgb * (cor + u_emissivo * u_luzLigada) + especular;
 
+            if (u_modeloLigado < 0.5) corFinal = base.rgb * mix(0.25, 1.0, u_luzLigada);   // sem sombreado, mas respeita o K
+
             // --- MELHORIA DE CORES ---
             // Aumenta ligeiramente a saturação e o contraste para as cores saltarem à vista
             corFinal = pow(corFinal, vec3(0.9)); // Contraste mais suave e rico
@@ -179,7 +185,7 @@ const fsSource = `
             corFinal = mix(corFinal, corNeblina, fatorNeblina);
 }
 
-            gl_FragColor = vec4(corFinal, base.a);
+                        gl_FragColor = vec4(corFinal, base.a * mix(1.0, u_luzLigada, u_brilho));
         }
     }
 `;
@@ -216,7 +222,8 @@ window.addEventListener('keydown', (event) => {
         case 'v': ventoLigado = !ventoLigado; break;
         case 'n': neblinaLigada = !neblinaLigada; break;
         case 'g': alternarTorneira(); break; 
-        case 'l': luzLigada = !luzLigada; break;
+        case 'l': modeloLigado = !modeloLigado; break;
+        case 'k': luzLigada = !luzLigada; break;
     }
 });
 
@@ -342,6 +349,7 @@ function render(time) {
         u_corLuz: iluminacao.corLuz,
         u_atenuacao: iluminacao.atenuacao,
         u_posCamera: posicaoOlho,
+        u_modeloLigado: modeloLigado ? 1.0 : 0.0,
     });
 
 

@@ -35,6 +35,10 @@ const Y_LAMPADA = -1.45;                 // altura local do centro da lâmpada (
 const RAIO_LAMPADA = 0.14;
 const COR_LAMPADA = [1.0, 0.92, 0.75, 1];
 const COR_BASE_LAMPADA = [0.55, 0.55, 0.6, 1];   // metal acinzentado
+// Brilho em volta da lâmpada: cascas cada vez maiores e mais transparentes
+const COR_BRILHO = [1.0, 0.75, 0.35];             // laranja quente
+const ESCALAS_BRILHO = [1.6, 2.2, 3.0, 4.0];      // tamanho de cada casca (x raio da lâmpada)
+const ALFAS_BRILHO = [0.22, 0.14, 0.09, 0.05];    // opacidade de cada casca
  
 // ---------- CORES [vermelho, verde, azul, opacidade] (0 a 1) ----------
 const COR_POSTE = [0.4, 0.4, 0.45, 1];
@@ -59,6 +63,7 @@ export function initVentilador(gl) {
         lampada: prim.createSphereBufferInfo(gl, RAIO_LAMPADA, 16, 12),
                 // tronco de cone: (gl, raioEmbaixo, raioEmCima, altura, lados, fatias, tampaCima, tampaBaixo)
         baseLampada: prim.createTruncatedConeBufferInfo(gl, 0.12, 0.0, 0.3, 24, 1, true, true),
+        brilho: prim.createSphereBufferInfo(gl, RAIO_LAMPADA, 24, 16),
     };
 }
 
@@ -228,8 +233,24 @@ export function desenharVentiladorTeto(gl, programInfo, viewProjection, time,
     // A lâmpada é EMISSIVA: liga u_emissivo só para ela e desliga logo depois,
     // porque uniform fica "grudado" entre um desenho e outro.
     const lampada = m4.translate(raiz, [0, Y_LAMPADA, 0]);
-    twgl.setUniforms(programInfo, { u_emissivo: 1 });
+        twgl.setUniforms(programInfo, { u_emissivo: 1 });
     desenharParte(gl, programInfo, viewProjection, formas.lampada, lampada, COR_LAMPADA);
+
+    // 6) BRILHO: cascas translúcidas em volta da lâmpada (desenhadas por último, por serem transparentes)
+    // Dessa forma elas não ficam atrás de nada.
+    twgl.setUniforms(programInfo, { u_brilho: 1 });
+    gl.depthMask(false);                    // translúcido não escreve no z-buffer
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);     // aditivo: soma luz
+    for (let i = 0; i < ESCALAS_BRILHO.length; i++) {
+        const e = ESCALAS_BRILHO[i];
+        const casca = m4.scale(lampada, [e, e, e]);   // mesma posição da bolinha, maior
+        const cor = [COR_BRILHO[0], COR_BRILHO[1], COR_BRILHO[2], ALFAS_BRILHO[i]];
+        desenharParte(gl, programInfo, viewProjection, formas.brilho, casca, cor);
+    }
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);   // volta ao blend normal
+    gl.depthMask(true);
+    twgl.setUniforms(programInfo, { u_brilho: 0 });
+
     twgl.setUniforms(programInfo, { u_emissivo: 0 });
 }
 

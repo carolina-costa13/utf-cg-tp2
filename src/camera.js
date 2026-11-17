@@ -142,7 +142,7 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, delta
         const eye = [Math.cos(cameraRotation) * 6 * zoom, 6 * zoom, Math.sin(cameraRotation) * 6 * zoom]
 
         // a própria posição da câmera livre é o olho
-        posicaoOlho = [...posicaoCamera];
+        posicaoOlho = eye;
 
         // A câmera olha sempre para a origem (o centro do diorama). 
         // O up diz qual direção é “para cima” na tela.
@@ -161,7 +161,7 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, delta
             Math.cos(alturaDaCamera) * Math.sin(giroHorizontal) * RAIO_ORBITAL
         ];
 
-        posicaoOlho = [...posicaoCamera];
+        posicaoOlho = eye;
 
         const target = [0, 0, 0]; // sempre olhando para o centro do diorama
         const up = [0, 1, 0];     // o eixo Y é "para cima" na tela
@@ -180,7 +180,7 @@ export function calcularMatrizesCamera(tipoCamera, cameraRotation, canvas, delta
         atualizarCameraLivre(deltaTime);
 
         posicaoOlho = [...posicaoCamera];
-        
+
         const frente = [
             Math.cos(pitch) * Math.sin(yaw),
             Math.sin(pitch),
